@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"encoding/binary"
 	"log"
-	"main/internal/shared"
 	"os"
+
+	"github.com/ryank157/perfAware/internal/shared"
 )
 
 func GenerateDataSetAndAnswerFiles(spread string, seed int, numPoints int) float64 {

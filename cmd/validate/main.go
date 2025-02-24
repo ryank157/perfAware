@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"main/internal/timing"
-	"main/internal/validator"
 	"os"
+
+	"github.com/ryank157/perfAware/internal/timing"
+	"github.com/ryank157/perfAware/internal/validator"
 )
 
 func main() {

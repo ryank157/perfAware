@@ -4,11 +4,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"main/internal/shared"
-	"main/internal/timing"
 	"math"
 	"os"
 	"unsafe"
+
+	"github.com/ryank157/perfAware/internal/shared"
+	"github.com/ryank157/perfAware/internal/timing"
 )
 
 type ValidateTimers struct {

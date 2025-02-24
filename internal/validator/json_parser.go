@@ -2,8 +2,9 @@ package validator
 
 import (
 	"fmt"
-	"main/internal/shared"
 	"os"
+
+	"github.com/ryank157/perfAware/internal/shared"
 )
 
 const (

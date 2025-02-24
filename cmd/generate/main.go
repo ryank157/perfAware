@@ -4,8 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"main/internal/generator"
 	"strconv"
+
+	"github.com/ryank157/perfAware/internal/generator"
 )
 
 type GenerateTimers struct {
