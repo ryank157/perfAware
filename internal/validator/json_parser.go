@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ryank157/perfAware/internal/shared"
+	"github.com/ryank157/perfAware/internal/timing"
 )
 
 const (
@@ -378,6 +379,7 @@ func IsInBounds(source []byte, at int) bool {
 }
 
 func ParseHaversinePairs(inputJSON []byte, maxPairCount int, pairs []shared.HaversinePair) int {
+	defer timing.TimeFunction()()
 	parser := Parser{Source: inputJSON}
 
 	JSON := parser.ParseJSON(inputJSON)

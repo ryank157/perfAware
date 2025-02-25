@@ -9,7 +9,6 @@ import (
 	"unsafe"
 
 	"github.com/ryank157/perfAware/internal/shared"
-	"github.com/ryank157/perfAware/internal/timing"
 )
 
 type ValidateTimers struct {
@@ -22,11 +21,8 @@ type ValidateTimers struct {
 	End        uint64
 }
 
-func ValidateData(inputFileName string, answersFileName string, t *ValidateTimers) {
-
-	t.Read = timing.CpuTimer()
+func ValidateData(inputFileName string, answersFileName string) {
 	inputJSONBuffer, err := shared.ReadEntireFile(inputFileName)
-	t.MiscSetup = timing.CpuTimer()
 	if err != nil {
 		log.Fatalf("Error reading JSON file: %v", err)
 	}
@@ -45,11 +41,8 @@ func ValidateData(inputFileName string, answersFileName string, t *ValidateTimer
 			// and it's essential for working with the byte-oriented buffer.
 			pairs := unsafe.Slice((*shared.HaversinePair)(unsafe.Pointer(&parsedValuesBuffer.Data[0])), maxPairCount)
 
-			t.Parse = timing.CpuTimer()
 			pairCount := ParseHaversinePairs(inputJSONBuffer.Data, int(maxPairCount), pairs)
-			t.Sum = timing.CpuTimer()
 			sum := shared.SumHaversineDistances(pairCount, pairs[:pairCount]) // Slice only the populated part of the pair
-			t.MiscOutput = timing.CpuTimer()
 			fmt.Printf("Input size: %d\n", inputJSONBuffer.Count)
 			fmt.Printf("Pair count: %d\n", pairCount)
 			fmt.Printf("Haversine sum: %.16f\n", sum)
@@ -82,7 +75,6 @@ func ValidateData(inputFileName string, answersFileName string, t *ValidateTimer
 			fmt.Fprintf(os.Stderr, "ERROR: Could not allocate memory for parsed values.\n")
 			os.Exit(1) // Fatal error, so exit
 		}
-		t.End = timing.CpuTimer()
 	} else {
 		fmt.Fprintf(os.Stderr, "ERROR: Malformed input JSON\n")
 		os.Exit(1) // Fatal error, so exit

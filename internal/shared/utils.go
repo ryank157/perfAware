@@ -3,6 +3,8 @@ package shared
 import (
 	"fmt"
 	"os"
+
+	"github.com/ryank157/perfAware/internal/timing"
 )
 
 type Buffer struct {
@@ -22,6 +24,7 @@ func FreeBuffer(buf *Buffer) {
 
 // struct and func from earlier replies
 func ReadEntireFile(fileName string) (Buffer, error) {
+	defer timing.TimeFunction()()
 	data, err := os.ReadFile(fileName)
 	if err != nil {
 		return Buffer{}, fmt.Errorf("unable to read file: %w", err) // Wrap error for context

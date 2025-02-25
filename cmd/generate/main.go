@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/ryank157/perfAware/internal/generator"
+	"github.com/ryank157/perfAware/internal/timing"
 )
 
 type GenerateTimers struct {
@@ -20,8 +21,8 @@ type GenerateTimers struct {
 }
 
 func main() {
-	var timingEnabled bool
-	flag.BoolVar(&timingEnabled, "timing", false, "Enable timing measurements")
+	// var timingEnabled bool
+	// flag.BoolVar(&timingEnabled, "timing", false, "Enable timing measurements")
 	flag.Parse()
 	spread := flag.Arg(0)
 	if spread != "uniform" && spread != "cluster" {
@@ -39,11 +40,12 @@ func main() {
 	}
 
 	// Generate data + answer file as bin
+	timing.BeginProfile()
 	avgDistance := generator.GenerateDataSetAndAnswerFiles(spread, seed, numPoints)
 
 	fmt.Printf("Method: %s\n", spread)
 	fmt.Printf("Random seed: %d\n", seed)
 	fmt.Printf("Pair count: %d\n", numPoints)
 	fmt.Printf("Average distance: %f\n", avgDistance)
-
+	timing.EndAndPrintProfile()
 }
