@@ -28,3 +28,7 @@ go.work.sum
 *.f64
 *.bin
 *.json
+
+# go executables
+generate
+validate
