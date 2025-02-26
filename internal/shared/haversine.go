@@ -129,7 +129,6 @@ func Square(x float64) float64 {
 const EarthRadius = 6372.8 // km
 
 func Haversine(pair HaversinePair) float64 {
-	defer timing.TimeFunction()()
 	dX := Radians(pair.X1 - pair.X0)
 	dY := Radians(pair.Y1 - pair.Y0)
 	y0 := Radians(pair.Y0)
@@ -143,7 +142,7 @@ func Haversine(pair HaversinePair) float64 {
 }
 
 func SumHaversineDistances(pairCount int, pairs []HaversinePair) float64 {
-	defer timing.TimeFunction()()
+	// defer timing.TimeFunction()()
 	sum := 0.0
 	sumCoef := 1.0 / float64(pairCount)
 	for pairIndex := range pairCount {
