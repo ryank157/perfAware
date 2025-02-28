@@ -1,3 +1,5 @@
+//go:build !timing
+
 package timing
 
 import (
@@ -124,8 +126,17 @@ func printTimeElapsed(totalTSCElapsed uint64, anchor *ProfileAnchor) {
 	fmt.Printf(")\n")
 }
 
+var enableTimingStr = "false"
+
+func IsTimingEnabled() bool {
+	return enableTimingStr == "true"
+}
+
 // TimeBlock is a function that returns a function to stop the timer
 func TimeBlock(label string) func() {
+	if !IsTimingEnabled() {
+		return func() {}
+	}
 
 	parentIndex := GlobalProfiler.currentParent.Load()
 	anchorIndex := getOrAddAnchor(label)
@@ -178,6 +189,10 @@ func getOrAddAnchor(label string) int32 {
 
 // TimeFunction is a helper function to time an entire function duration
 func TimeFunction(funcName ...string) func() {
+	if !IsTimingEnabled() {
+		return func() {}
+	}
+
 	var blockLabel string
 
 	if len(funcName) > 0 {
