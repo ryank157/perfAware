@@ -142,7 +142,7 @@ func Haversine(pair HaversinePair) float64 {
 }
 
 func SumHaversineDistances(pairCount int, pairs []HaversinePair) float64 {
-	// defer timing.TimeFunction()()
+	defer timing.TimeFunction()()
 	sum := 0.0
 	sumCoef := 1.0 / float64(pairCount)
 	for pairIndex := range pairCount {

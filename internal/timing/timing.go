@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -51,78 +52,73 @@ func PrintTimeElapsed(label string, totalTSCElapsed uint64, begin uint64, end ui
 
 // ProfileAnchor stores timing information for a code block.
 type ProfileAnchor struct {
-	TSCElapsed         uint64
-	TSCElapsedChildren uint64
-	HitCount           uint64
-	Label              string
+	TSCElapsedExclusive atomic.Uint64
+	TSCElapsedInclusive atomic.Uint64
+	HitCount            atomic.Uint64
+	Label               string
 }
 
 // Profiler manages the profiling data.
 type Profiler struct {
 	Anchors       [4096]ProfileAnchor
-	AnchorMap     map[string]int // Map label to anchor index
-	StartTSC      uint64
-	EndTSC        uint64
-	Mutex         sync.Mutex
-	Counter       int // Counter for next available anchor
-	currentParent int
+	AnchorMap     sync.Map
+	StartTSC      atomic.Uint64
+	EndTSC        atomic.Uint64
+	Counter       atomic.Int32 // Use atomic for concurrent access
+	currentParent atomic.Int32 // Use atomic for currentParent
 }
 
 // GlobalProfiler is the global instance of the profiler.
-var GlobalProfiler = Profiler{
-	AnchorMap: make(map[string]int),
-}
+var GlobalProfiler = Profiler{}
 
 // BeginProfile starts the profiling session.
 func BeginProfile() {
-	GlobalProfiler.Mutex.Lock()
-	defer GlobalProfiler.Mutex.Unlock()
-	GlobalProfiler.StartTSC = CpuTimer()
-	GlobalProfiler.currentParent = 0
+	GlobalProfiler.StartTSC.Store(CpuTimer())
 
 	// Initialize the root anchor
 	GlobalProfiler.Anchors[0].Label = "Root"
-	GlobalProfiler.Anchors[0].TSCElapsed = 0
-	GlobalProfiler.Anchors[0].TSCElapsedChildren = 0
-	GlobalProfiler.Anchors[0].HitCount = 1
-	GlobalProfiler.AnchorMap["Root"] = 0
-	GlobalProfiler.Counter = 1
+	GlobalProfiler.Anchors[0].TSCElapsedExclusive.Store(0)
+	GlobalProfiler.Anchors[0].TSCElapsedInclusive.Store(0)
+	GlobalProfiler.Anchors[0].HitCount.Store(0)
+	GlobalProfiler.AnchorMap.Store("Root", 0)
+	GlobalProfiler.Counter.Store(1)
+	GlobalProfiler.currentParent.Store(0)
 
 }
 
 // EndAndPrintProfile ends the profiling session and prints the results.
 func EndAndPrintProfile() {
-	GlobalProfiler.Mutex.Lock()
-	defer GlobalProfiler.Mutex.Unlock()
-	GlobalProfiler.EndTSC = CpuTimer()
+	GlobalProfiler.EndTSC.Store(CpuTimer())
 
 	cpuFreq := EstimateCPUFrequency()
-	totalCPUElapsed := GlobalProfiler.EndTSC - GlobalProfiler.StartTSC
+	totalCPUElapsed := GlobalProfiler.EndTSC.Load() - GlobalProfiler.StartTSC.Load()
 
 	if cpuFreq > 0 {
 		fmt.Printf("\nTotal time: %.4fms (CPU freq %d)\n", 1000.0*float64(totalCPUElapsed)/float64(cpuFreq), cpuFreq)
 	}
 
-	for i := 0; i < len(GlobalProfiler.Anchors); i++ {
+	for i := 0; i < int(GlobalProfiler.Counter.Load()); i++ {
 		anchor := &GlobalProfiler.Anchors[i]
-		if anchor.TSCElapsed > 0 {
+		if anchor.TSCElapsedExclusive.Load() > 0 {
 			printTimeElapsed(totalCPUElapsed, anchor)
 		}
 	}
 }
 
 func printTimeElapsed(totalTSCElapsed uint64, anchor *ProfileAnchor) {
-	elapsed := anchor.TSCElapsed - anchor.TSCElapsedChildren
+	exclusive := anchor.TSCElapsedExclusive.Load()
 
-	if elapsed > totalTSCElapsed {
+	if exclusive > totalTSCElapsed {
 		fmt.Printf("WARNING: Invalid timing for %s - elapsed time exceeds total time\n", anchor.Label)
-		elapsed = totalTSCElapsed
+		exclusive = totalTSCElapsed
 	}
 
-	percent := 100.0 * (float64(elapsed) / float64(totalTSCElapsed))
-	fmt.Printf("  %s[%d]: %d (%.2f%%", anchor.Label, anchor.HitCount, elapsed, percent)
-	if anchor.TSCElapsedChildren > 0 {
-		percentWithChildren := 100.0 * (float64(anchor.TSCElapsed) / float64(totalTSCElapsed))
+	percent := 100.0 * (float64(exclusive) / float64(totalTSCElapsed))
+	fmt.Printf("  %s[%d]: %d (%.2f%%", anchor.Label, anchor.HitCount.Load(), exclusive, percent)
+
+	inclusive := anchor.TSCElapsedInclusive.Load()
+	if inclusive != exclusive {
+		percentWithChildren := 100.0 * (float64(inclusive) / float64(totalTSCElapsed))
 		fmt.Printf(", %.2f%% w/children", percentWithChildren)
 	}
 	fmt.Printf(")\n")
@@ -131,41 +127,53 @@ func printTimeElapsed(totalTSCElapsed uint64, anchor *ProfileAnchor) {
 // TimeBlock is a function that returns a function to stop the timer
 func TimeBlock(label string) func() {
 
-	GlobalProfiler.Mutex.Lock()
+	parentIndex := GlobalProfiler.currentParent.Load()
+	anchorIndex := getOrAddAnchor(label)
 
-	anchorIndex, ok := GlobalProfiler.AnchorMap[label]
-	if !ok {
-		if GlobalProfiler.Counter >= len(GlobalProfiler.Anchors) {
-			fmt.Println("Warning: Too many profile blocks, skipping:", label)
-			return func() {} //No-op function
-		}
-		anchorIndex = GlobalProfiler.Counter
-		GlobalProfiler.AnchorMap[label] = anchorIndex
-		GlobalProfiler.Counter++
-		GlobalProfiler.Anchors[anchorIndex].Label = label // Set label only once
-	}
-
+	oldInclusive := GlobalProfiler.Anchors[anchorIndex].TSCElapsedInclusive.Load()
+	GlobalProfiler.currentParent.Store(anchorIndex)
 	startTime := CpuTimer()
-	parentIndex := GlobalProfiler.currentParent
-	GlobalProfiler.currentParent = anchorIndex
-
-	GlobalProfiler.Mutex.Unlock()
 
 	return func() {
-		GlobalProfiler.Mutex.Lock()
-		defer GlobalProfiler.Mutex.Unlock()
-		elapsed := CpuTimer() - startTime
-		anchor := &GlobalProfiler.Anchors[anchorIndex]
-		anchor.TSCElapsed += elapsed
-		anchor.HitCount++
 
-		GlobalProfiler.currentParent = parentIndex
-		if parentIndex >= 0 && parentIndex < GlobalProfiler.Counter {
-			parent := &GlobalProfiler.Anchors[parentIndex]
-			parent.TSCElapsedChildren += elapsed
+		elapsed := CpuTimer() - startTime
+		GlobalProfiler.currentParent.Store(parentIndex)
+
+		anchor := &GlobalProfiler.Anchors[anchorIndex]
+		parent := &GlobalProfiler.Anchors[parentIndex]
+
+		//1. Subtract elapsed time from parent's exlusive time
+		if parentIndex > 0 {
+			parent.TSCElapsedExclusive.Add(^(elapsed - 1))
 		}
 
+		//2. Add elapsed time to current anchor's exclusive time
+		anchor.TSCElapsedExclusive.Add(elapsed)
+
+		//3. Set inclusive time (total time including children)
+		anchor.TSCElapsedInclusive.Store(oldInclusive + elapsed)
+
+		//4. Increment hit count
+		anchor.HitCount.Add(1)
+
 	}
+}
+
+func getOrAddAnchor(label string) int32 {
+	val, ok := GlobalProfiler.AnchorMap.Load(label)
+	if ok {
+		return val.(int32)
+	}
+	newIndex := GlobalProfiler.Counter.Add(1) - 1
+	if int(newIndex) >= len(GlobalProfiler.Anchors) {
+		fmt.Println("Warning: Too many profile blocks, skipping:", label)
+		return 0 // Return a dummy anchor index
+	}
+
+	GlobalProfiler.AnchorMap.Store(label, newIndex)
+	anchor := &GlobalProfiler.Anchors[newIndex]
+	anchor.Label = label
+	return newIndex
 }
 
 // TimeFunction is a helper function to time an entire function duration

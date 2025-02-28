@@ -9,7 +9,6 @@ import (
 	"unsafe"
 
 	"github.com/ryank157/perfAware/internal/shared"
-	"github.com/ryank157/perfAware/internal/timing"
 )
 
 type ValidateTimers struct {
@@ -23,7 +22,6 @@ type ValidateTimers struct {
 }
 
 func ValidateData(inputFileName string, answersFileName string) {
-	defer timing.TimeFunction()()
 	inputJSONBuffer, err := shared.ReadEntireFile(inputFileName)
 	if err != nil {
 		log.Fatalf("Error reading JSON file: %v", err)
@@ -54,6 +52,7 @@ func ValidateData(inputFileName string, answersFileName string) {
 				log.Printf("Warning: Error reading answer file: %v", err) // Don't crash if validation fails
 				return                                                    // Important to RETURN here
 			}
+
 			defer shared.FreeBuffer(&answersF64Buffer)
 
 			if answersF64Buffer.Count != int64(unsafe.Sizeof(float64(0))) {

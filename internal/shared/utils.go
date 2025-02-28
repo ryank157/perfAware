@@ -20,6 +20,7 @@ func AllocateBuffer(size int64) Buffer {
 func FreeBuffer(buf *Buffer) {
 	buf.Data = nil // Release the memory held by the buffer's slice
 	buf.Count = 0  // Reset the count  VERY important
+	// runtime.GC()
 }
 
 // struct and func from earlier replies

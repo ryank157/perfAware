@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ryank157/perfAware/internal/shared"
+	"github.com/ryank157/perfAware/internal/timing"
 )
 
 const (
@@ -207,6 +208,7 @@ func (p *Parser) ExtractTokenValue(token Token) string {
 }
 
 func (p *Parser) _ParseJSONList(startingToken Token, endType int, hasLabels bool) *Element {
+	// defer timing.TimeFunction()()
 	var firstElement *Element
 	var lastElement *Element
 
@@ -378,15 +380,17 @@ func IsInBounds(source []byte, at int) bool {
 }
 
 func ParseHaversinePairs(inputJSON []byte, maxPairCount int, pairs []shared.HaversinePair) int {
-	// defer timing.TimeFunction()()
+	defer timing.TimeFunction()()
 	parser := Parser{Source: inputJSON}
 
+	stopTimer := timing.TimeBlock("Parse JSON")
 	JSON := parser.ParseJSON(inputJSON)
-
+	stopTimer()
 	pairCount := 0
 	pairsArray := LookupElement(JSON, "pairs")
 
 	if pairsArray != nil {
+		stopTimer = timing.TimeBlock("Convert to Float")
 		for element := pairsArray.FirstSubElement; element != nil && pairCount < maxPairCount; element = element.NextSibling {
 			pair := &pairs[pairCount]
 			pair.X0 = ConvertElementToFloat64(element, "X0")
@@ -395,6 +399,7 @@ func ParseHaversinePairs(inputJSON []byte, maxPairCount int, pairs []shared.Have
 			pair.Y1 = ConvertElementToFloat64(element, "Y1")
 			pairCount++
 		}
+		stopTimer()
 	}
 	return pairCount
 }
